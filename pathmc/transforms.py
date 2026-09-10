@@ -100,6 +100,13 @@ class Transform:
 
     name: str
     param_specs: dict[str, ParamSpec]
+    #: Whether the transform is homogeneous of degree 1 in its input.
+    #: ``True`` (adstock): a coefficient on the transform stays in "per
+    #: unit of the raw input". ``False`` (logistic_saturation): the
+    #: output is unitless and the coefficient is *not* divided by the
+    #: input factor. ``None`` (undeclared): rescaling a labeled
+    #: coefficient on this transform raises rather than guessing.
+    homogeneous: bool | None = None
 
     def emit_prior(self, param_name: str, spec: ParamSpec) -> Any:
         """Create a PyMC random variable for a transform parameter.
@@ -204,6 +211,7 @@ class Adstock(Transform):
     """
 
     name = "adstock"
+    homogeneous = True
     param_specs = {
         "decay": ParamSpec(constraint="unit_interval", default_prior="Beta(2, 2)"),
     }
@@ -252,6 +260,11 @@ class Adstock(Transform):
         panel_info: Any | None = None,
         data: Any | None = None,
     ) -> Any:
+        if "decay" not in params:
+            raise ValueError(
+                "adstock() requires a decay parameter. Pass decay=<name> in the "
+                "formula, e.g. adstock(tv, decay=theta_tv)."
+            )
         decay = params["decay"]
 
         if panel_info is not None and data is not None:
@@ -319,6 +332,11 @@ class Adstock(Transform):
                 f"these models, or restructure the model so adstock() does "
                 f"not need scan compilation (e.g. no panel temporal deps)."
             )
+        if "decay" not in params:
+            raise ValueError(
+                "adstock() requires a decay parameter. Pass decay=<name> in the "
+                "formula, e.g. adstock(tv, decay=theta_tv)."
+            )
         decay = params["decay"]
         adstock_t = x_t + decay * state
         return adstock_t, adstock_t
@@ -331,6 +349,7 @@ class LogisticSaturation(Transform):
     """
 
     name = "logistic_saturation"
+    homogeneous = False
     param_specs = {
         "lam": ParamSpec(constraint="positive", default_prior="HalfNormal(1)"),
     }
